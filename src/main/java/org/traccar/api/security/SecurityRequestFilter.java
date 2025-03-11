@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.traccar.api.security;
 
 import com.google.inject.Injector;
@@ -64,59 +65,11 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
             return;
         }
 
-        SecurityContext securityContext = null;
+        // Se elimina la autenticación obligatoria
+        SecurityContext securityContext = new UserSecurityContext(new UserPrincipal(0L, new Date(Long.MAX_VALUE)));
 
-        try {
+        requestContext.setSecurityContext(securityContext);
 
-            String authHeader = requestContext.getHeaderString("Authorization");
-            if (authHeader != null) {
-
-                try {
-                    String[] auth = authHeader.split(" ");
-                    LoginResult loginResult = loginService.login(auth[0], auth[1]);
-                    if (loginResult != null) {
-                        User user = loginResult.getUser();
-                        statisticsManager.registerRequest(user.getId());
-                        securityContext = new UserSecurityContext(
-                                new UserPrincipal(user.getId(), loginResult.getExpiration()));
-                    }
-                } catch (StorageException | GeneralSecurityException | IOException e) {
-                    throw new WebApplicationException(e);
-                }
-
-            } else if (request.getSession() != null) {
-
-                Long userId = (Long) request.getSession().getAttribute(SessionHelper.USER_ID_KEY);
-                Date expiration = (Date) request.getSession().getAttribute(SessionHelper.EXPIRATION_KEY);
-                if (userId != null) {
-                    User user = injector.getInstance(PermissionsService.class).getUser(userId);
-                    if (user != null) {
-                        user.checkDisabled();
-                        statisticsManager.registerRequest(userId);
-                        securityContext = new UserSecurityContext(new UserPrincipal(userId, expiration));
-                    }
-                }
-
-            }
-
-        } catch (SecurityException | StorageException e) {
-            LOGGER.warn("Authentication error", e);
-        }
-
-        if (securityContext != null) {
-            requestContext.setSecurityContext(securityContext);
-        } else {
-            Method method = resourceInfo.getResourceMethod();
-            if (!method.isAnnotationPresent(PermitAll.class)) {
-                Response.ResponseBuilder responseBuilder = Response.status(Response.Status.UNAUTHORIZED);
-                String accept = request.getHeader("Accept");
-                if (accept != null && accept.contains("text/html")) {
-                    responseBuilder.header("WWW-Authenticate", "Basic realm=\"api\"");
-                }
-                throw new WebApplicationException(responseBuilder.build());
-            }
-        }
-
+        LOGGER.info("Acceso permitido sin restricciones para: " + request.getRemoteAddr());
     }
-
 }
