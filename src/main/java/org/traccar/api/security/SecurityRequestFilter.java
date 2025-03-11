@@ -103,19 +103,13 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
             LOGGER.warn("Authentication error", e);
         }
 
-        if (securityContext != null) {
-            requestContext.setSecurityContext(securityContext);
-        } else {
-            Method method = resourceInfo.getResourceMethod();
-            if (!method.isAnnotationPresent(PermitAll.class)) {
-                Response.ResponseBuilder responseBuilder = Response.status(Response.Status.UNAUTHORIZED);
-                String accept = request.getHeader("Accept");
-                if (accept != null && accept.contains("text/html")) {
-                    responseBuilder.header("WWW-Authenticate", "Basic realm=\"api\"");
-                }
-                throw new WebApplicationException(responseBuilder.build());
-            }
-        }
+     if (securityContext != null) {
+    requestContext.setSecurityContext(securityContext);
+} else {
+    // Permitir todas las solicitudes sin autenticación
+    requestContext.setSecurityContext(new UserSecurityContext(new UserPrincipal(0L, new Date(Long.MAX_VALUE))));
+}
+
 
     }
 
